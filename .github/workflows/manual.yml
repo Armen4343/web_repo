@@ -1,4 +1,4 @@
-name: Manual Trigger Workflow
+name: Test and deploy image
 
 on:
   workflow_dispatch:
