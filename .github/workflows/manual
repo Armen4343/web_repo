@@ -1,0 +1,51 @@
+name: Manual Trigger Workflow
+
+on:
+  workflow_dispatch:
+    
+env:
+  DOCKER_USERNAME: ${{ vars.DOCKER_USERNAME }}
+  DOCKER_PASSWORD: ${{ secrets.DOCKER_PASSWORD }}
+  DOCKER_IMAGE_NAME: ${{ vars.DOCKER_IMAGE_NAME }}
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+    - name: Pull docker image
+      run: |
+        docker login -u $DOCKER_USERNAME -p $DOCKER_PASSWORD
+        docker pull $DOCKER_USERNAME/$DOCKER_IMAGE_NAME:latest
+        
+    - name: Run docker container and verify
+      run: |
+        docker run -d -p 80:80 --name testing $DOCKER_USERNAME/$DOCKER_IMAGE_NAME:latest
+        sleep 10
+        docker exec testing curl --fail localhost > test.txt 2>&1
+        if grep -q "error" test.txt; then
+          echo "Container is unhealty"
+          exit 1
+        else
+          echo "Container is healty"
+          exit 0
+        fi
+    
+        
+  ecs-update:
+    needs: build
+    runs-on: ubuntu-latest
+    steps:
+    - name: Setup AWS CLI
+      uses: aws-actions/configure-aws-credentials@v1
+      with:
+        aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+        aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+        aws-region: "us-east-1"
+    - name: Install ecs-cli
+      run: |
+        sudo curl -sLo /usr/local/bin/ecs-cli https://amazon-ecs-cli.s3.amazonaws.com/ecs-cli-linux-amd64-latest
+        sudo chmod +x /usr/local/bin/ecs-cli
+        
+    - name: Update ECS Service
+      run: |
+        aws ecs update-service --cluster my-ecs-cluster --service ninth_wave_service --force-new-deployment
