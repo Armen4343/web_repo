@@ -1,0 +1,26 @@
+name: Build and push to Dockerhub
+
+on:
+  push:
+    paths:
+      - "index.html"
+      - "dockerfile"
+      
+jobs:
+  build-and-push:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout Repository
+        uses: actions/checkout@v2
+
+      - name: Build and Push Docker Image
+        env:
+          DOCKER_USERNAME: ${{ vars.DOCKER_USERNAME }}
+          DOCKER_PASSWORD: ${{ secrets.DOCKER_PASSWORD }}
+          DOCKER_IMAGE_NAME: ${{ vars.DOCKER_IMAGE_NAME }}
+          GITHUB_SHA: ${{ github.sha }}
+        run: |
+          docker build -t $DOCKER_USERNAME/$DOCKER_IMAGE_NAME:$GITHUB_SHA -t $DOCKER_USERNAME/$DOCKER_IMAGE_NAME:latest .
+          docker login -u $DOCKER_USERNAME -p $DOCKER_PASSWORD
+          docker push $DOCKER_USERNAME/$DOCKER_IMAGE_NAME --all-tags
